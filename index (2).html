@@ -1,0 +1,200 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boğaz ve Kanal Bulma Oyunu</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans்ட
+
+System: I'm sorry, but it looks like the artifact content was cut off. Let me complete the game for you with the full HTML, JavaScript, and CSS, ensuring it meets your request: a fully Turkish game where clicking a marker on a world map immediately shows the corresponding strait or canal's name in both the feedback area and popup, with no text input or dropdown selection. The game includes "Tüm Cevapları Göster" and "Yeni Oyun" buttons, and is optimized for touch screens.
+
+<xaiArtifact artifact_id="a860ff87-0d1c-493c-86c8-ad0e413ffdfc" artifact_version_id="3ed153f4-2c15-492e-a130-ba48e8850e29" title="index.html" contentType="text/html">
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Boğaz ve Kanal Bulma Oyunu</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+        #oyun-konteyner {
+            text-align: center;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin: 20px;
+            max-width: 90%;
+        }
+        #harita {
+            height: 400px;
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+        button {
+            margin: 10px;
+            padding: 5px;
+            font-size: 16px;
+            width: 200px;
+            cursor: pointer;
+        }
+        #geri-bildirim {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        @media (max-width: 600px) {
+            #harita {
+                height: 300px;
+            }
+            button {
+                width: 80%;
+                margin: 5px auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="oyun-konteyner">
+        <h1>Boğaz ve Kanal Bulma Oyunu</h1>
+        <div id="harita"></div>
+        <button onclick="tumCevaplariGoster()">Tüm Cevapları Göster</button>
+        <button onclick="yeniOyun()">Yeni Oyun</button>
+        <p id="geri-bildirim"></p>
+    </div>
+
+    <script>
+        // Boğaz ve kanalların koordinatları
+        const bogazlar = [
+            { name: "Bering Boğazı", lat: 66.0, lng: -169.0 },
+            { name: "Panama Kanalı", lat: 9.0, lng: -79.5 },
+            { name: "Macellan Boğazı", lat: -53.0, lng: -70.0 },
+            { name: "Dover Boğazı", lat: 51.0, lng: 1.5 },
+            { name: "Cebelitarık Boğazı", lat: 36.0, lng: -5.5 },
+            { name: "Süveyş Kanalı", lat: 30.0, lng: 32.5 },
+            { name: "Kiel Kanalı", lat: 54.0, lng: 9.5 },
+            { name: "Korint Kanalı", lat: 37.9, lng: 22.9 },
+            { name: "Malakka Boğazı", lat: 2.0, lng: 101.0 },
+            { name: "Babülmendep Boğazı", lat: 12.5, lng: 43.5 },
+            { name: "Hürmüz Boğazı", lat: 26.5, lng: 56.5 }
+        ];
+
+        let karisikBogazlar = [];
+        let gosterilenCevaplar = new Set();
+        let harita;
+        let isaretciler = [];
+
+        // Haritayı başlat
+        function haritayiBaslat() {
+            harita = L.map('harita').setView([20, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> katkıda bulunanlar'
+            }).addTo(harita);
+        }
+
+        // Oyunu başlat
+        function oyunuBaslat() {
+            karisikBogazlar = [...bogazlar].sort(() => Math.random() - 0.5);
+            gosterilenCevaplar.clear();
+            haritayiGuncelle();
+            document.getElementById("geri-bildirim").innerText = "Bir işaretçiye tıklayın!";
+        }
+
+        // Haritayı işaretçilerle güncelle
+        function haritayiGuncelle() {
+            // Mevcut işaretçileri temizle
+            isaretciler.forEach(isaretci => harita.removeLayer(isaretci));
+            isaretciler = [];
+
+            // Yeni işaretçiler ekle
+            karisikBogazlar.forEach((bogaz, index) => {
+                let isaretciMetni = gosterilenCevaplar.has(index) ? `${index + 1}. ${bogaz.name}` : `${index + 1}`;
+                let isaretci = L.marker([bogaz.lat, bogaz.lng])
+                    .addTo(harita)
+                    .bindPopup(isaretciMetni);
+                isaretci.on('click', () => {
+                    let geriBildirim = document.getElementById("geri-bildirim");
+                    gosterilenCevaplar.add(index);
+                    isaretciMetni = `${index + 1}. ${bogaz.name}`;
+                    isaretci.setPopupContent(isaretciMetni);
+                    geriBildirim.innerText = `İşaretçi ${index + 1}: ${bogaz.name}`;
+                });
+                isaretciler.push(isaretci);
+            });
+        }
+
+        // Tüm cevapları göster
+        function tumCevaplariGoster() {
+            gosterilenCevaplar.clear();
+            for (let i = 0; i < karisikBogazlar.length; i++) {
+                gosterilenCevaplar.add(i);
+            }
+            haritayiGuncelle();
+            document.getElementById("geri-bildirim").innerText = "Tüm cevaplar açıldı! İşaretçilere tıklayın.";
+        }
+
+        // Yeni oyun başlat
+        function yeniOyun() {
+            oyunuBaslat();
+        }
+
+        // Oyunu başlat
+        haritayiBaslat();
+        oyunuBaslat();
+    </script>
+</body>
+</html>
